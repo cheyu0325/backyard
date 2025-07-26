@@ -20,29 +20,37 @@ generate_files() {
     ENTITY_FILE=$1
     ENTITY_NAME=$(basename "$ENTITY_FILE" .java)
 
-    # Extract ID type: @Id first, if not found then @EmbeddedId
-    ID_TYPE=$(grep -A 2 "@Id" "$ENTITY_FILE" | grep -v "@Id" | grep -oE '\b[A-Z][a-zA-Z0-9]*\b' | head -n 1)
+    # ==== Extract ID type using awk to avoid misdetection ====
+    ID_TYPE=$(awk '
+/@Id/ {found=1; next}
+found && /private/ {match($0,/private[[:space:]]+([^[:space:]]+)[[:space:]]+/,a); print a[1]; exit}
+' "$ENTITY_FILE")
+
     if [ -z "$ID_TYPE" ]; then
-        ID_TYPE=$(grep -A 2 "@EmbeddedId" "$ENTITY_FILE" | grep -v "@EmbeddedId" | grep -oE '\b[A-Z][a-zA-Z0-9]*\b' | head -n 1)
+        ID_TYPE=$(awk '
+/@EmbeddedId/ {found=1; next}
+found && /private/ {match($0,/private[[:space:]]+([^[:space:]]+)[[:space:]]+/,a); print a[1]; exit}
+' "$ENTITY_FILE")
     fi
+
     if [ -z "$ID_TYPE" ]; then
-        echo "⚠️ WARNING: No @Id or @EmbeddedId field found in $ENTITY_NAME. Skipping."
+        echo "⚠️ WARNING: No @Id or @EmbeddedId found in $ENTITY_NAME. Skipping."
         return
     fi
 
-    # Extract @Table name or default entity name (lowercase)
+    # ==== Extract table name from @Table or default entity name ====
     TABLE_NAME=$(grep "@Table" "$ENTITY_FILE" | sed -n 's/.*name *= *"\([^"]*\)".*/\1/p')
     if [ -z "$TABLE_NAME" ]; then
         TABLE_NAME=$(echo "$ENTITY_NAME" | awk '{print tolower($0)}')
     fi
 
-    # Determine if ID_TYPE is complex (EmbeddedId)
+    # ==== Check if ID_TYPE is complex (EmbeddedId class) ====
     IMPORT_ID_CLASS=""
     if [[ "$ID_TYPE" != "Long" && "$ID_TYPE" != "Integer" && "$ID_TYPE" != "String" ]]; then
         IMPORT_ID_CLASS="import ${BASE_PACKAGE}.${ID_TYPE};"
     fi
 
-    # Repository file
+    # ==== Generate Repository ====
     REPO_FILE="${REPO_DIR}/${ENTITY_NAME}Repository.java"
     cat > "$REPO_FILE" <<EOF
 package ${REPO_PACKAGE};
@@ -57,7 +65,7 @@ public interface ${ENTITY_NAME}Repository extends JpaRepository<${ENTITY_NAME}, 
 }
 EOF
 
-    # Service Interface file
+    # ==== Generate Service Interface ====
     SERVICE_FILE="${SERVICE_DIR}/${ENTITY_NAME}Service.java"
     cat > "$SERVICE_FILE" <<EOF
 package ${SERVICE_PACKAGE};
@@ -79,7 +87,7 @@ public interface ${ENTITY_NAME}Service {
 }
 EOF
 
-    # Service Impl file
+    # ==== Generate Service Implementation ====
     SERVICE_IMPL_FILE="${SERVICE_IMPL_DIR}/${ENTITY_NAME}ServiceImpl.java"
     cat > "$SERVICE_IMPL_FILE" <<EOF
 package ${SERVICE_IMPL_PACKAGE};
@@ -264,7 +272,7 @@ public class ${ENTITY_NAME}ServiceImpl implements ${ENTITY_NAME}Service {
 }
 EOF
 
-    echo "✅ Generated: ${ENTITY_NAME}Repository, ${ENTITY_NAME}Service, ${ENTITY_NAME}ServiceImpl with EmbeddedId support and dynamic imports"
+    echo "✅ Generated: ${ENTITY_NAME}Repository, ${ENTITY_NAME}Service, ${ENTITY_NAME}ServiceImpl (with EmbeddedId support and bug fix)"
 }
 
 for ENTITY_FILE in ${ENTITY_DIR}/*.java; do
