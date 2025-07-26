@@ -120,7 +120,7 @@ import ${BASE_PACKAGE}.service.${ENTITY_NAME}Service;
 @Service
 public class ${ENTITY_NAME}ServiceImpl implements ${ENTITY_NAME}Service {
 
-    private static final Logger log = LoggerFactory.getLogger(${ENTITY_NAME}ServiceImpl.class);
+    private static final Logger logger = LoggerFactory.getLogger(${ENTITY_NAME}ServiceImpl.class);
 
     @Autowired
     private ${ENTITY_NAME}Repository repository;
@@ -133,35 +133,35 @@ public class ${ENTITY_NAME}ServiceImpl implements ${ENTITY_NAME}Service {
     @Override
     @Transactional
     public ${ENTITY_NAME} save(${ENTITY_NAME} entity) {
-        log.info("Saving ${ENTITY_NAME}: {}", entity);
+        logger.info("Saving ${ENTITY_NAME}: {}", entity);
         return repository.save(entity);
     }
 
     @Override
     @Transactional
     public ${ENTITY_NAME} update(${ENTITY_NAME} entity) {
-        log.info("Updating ${ENTITY_NAME}: {}", entity);
+        logger.info("Updating ${ENTITY_NAME}: {}", entity);
         return repository.save(entity);
     }
 
     @Override
     @Transactional(readOnly = true)
     public Optional<${ENTITY_NAME}> findById(${ID_TYPE} id) {
-        log.debug("Finding ${ENTITY_NAME} by ID: {}", id);
+        logger.debug("Finding ${ENTITY_NAME} by ID: {}", id);
         return repository.findById(id);
     }
 
     @Override
     @Transactional
     public void delete(${ID_TYPE} id) {
-        log.warn("Deleting ${ENTITY_NAME} by ID: {}", id);
+        logger.warn("Deleting ${ENTITY_NAME} by ID: {}", id);
         repository.deleteById(id);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<${ENTITY_NAME}> findByCriteria(${ENTITY_NAME} criteriaEntity) {
-        log.debug("Executing Criteria Query for ${ENTITY_NAME}");
+        logger.debug("Executing Criteria Query for ${ENTITY_NAME}");
         CriteriaBuilder cb = em.getCriteriaBuilder();
         CriteriaQuery<${ENTITY_NAME}> cq = cb.createQuery(${ENTITY_NAME}.class);
         Root<${ENTITY_NAME}> root = cq.from(${ENTITY_NAME}.class);
@@ -220,7 +220,7 @@ public class ${ENTITY_NAME}ServiceImpl implements ${ENTITY_NAME}Service {
     @Override
     @Transactional(readOnly = true)
     public ${ENTITY_NAME} findByNativeSqlSingle(${ENTITY_NAME} criteriaEntity) {
-        log.debug("Executing Native SQL (Single Result) for ${ENTITY_NAME}");
+        logger.debug("Executing Native SQL (Single Result) for ${ENTITY_NAME}");
         StringBuilder sql = new StringBuilder("SELECT * FROM ${TABLE_NAME} WHERE 1=1");
         Map<String, Object> params = new HashMap<>();
 
@@ -256,7 +256,7 @@ public class ${ENTITY_NAME}ServiceImpl implements ${ENTITY_NAME}Service {
     @Override
     @Transactional(readOnly = true)
     public List<${ENTITY_NAME}> findByNativeSqlList(${ENTITY_NAME} criteriaEntity) {
-        log.debug("Executing Native SQL (List Result) for ${ENTITY_NAME}");
+        logger.debug("Executing Native SQL (List Result) for ${ENTITY_NAME}");
         StringBuilder sql = new StringBuilder("SELECT * FROM ${TABLE_NAME} WHERE 1=1");
         Map<String, Object> params = new HashMap<>();
 
