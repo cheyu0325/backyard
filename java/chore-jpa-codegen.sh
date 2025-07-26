@@ -36,28 +36,36 @@ generate_files() {
         TABLE_NAME=$(echo "$ENTITY_NAME" | awk '{print tolower($0)}')
     fi
 
-    # Repository
+    # Determine if ID_TYPE is complex (EmbeddedId)
+    IMPORT_ID_CLASS=""
+    if [[ "$ID_TYPE" != "Long" && "$ID_TYPE" != "Integer" && "$ID_TYPE" != "String" ]]; then
+        IMPORT_ID_CLASS="import ${BASE_PACKAGE}.${ID_TYPE};"
+    fi
+
+    # Repository file
     REPO_FILE="${REPO_DIR}/${ENTITY_NAME}Repository.java"
     cat > "$REPO_FILE" <<EOF
 package ${REPO_PACKAGE};
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
-import ${BASE_PACKAGE}.entity.${ENTITY_NAME};
+import ${BASE_PACKAGE}.${ENTITY_NAME};
+$IMPORT_ID_CLASS
 
 @Repository
 public interface ${ENTITY_NAME}Repository extends JpaRepository<${ENTITY_NAME}, ${ID_TYPE}> {
 }
 EOF
 
-    # Service Interface
+    # Service Interface file
     SERVICE_FILE="${SERVICE_DIR}/${ENTITY_NAME}Service.java"
     cat > "$SERVICE_FILE" <<EOF
 package ${SERVICE_PACKAGE};
 
 import java.util.List;
 import java.util.Optional;
-import ${BASE_PACKAGE}.entity.${ENTITY_NAME};
+import ${BASE_PACKAGE}.${ENTITY_NAME};
+$IMPORT_ID_CLASS
 
 public interface ${ENTITY_NAME}Service {
     ${ENTITY_NAME} save(${ENTITY_NAME} entity);
@@ -66,13 +74,12 @@ public interface ${ENTITY_NAME}Service {
     void delete(${ID_TYPE} id);
     List<${ENTITY_NAME}> findByCriteria(${ENTITY_NAME} criteria);
 
-    // Native SQL (dynamic by entity)
     ${ENTITY_NAME} findByNativeSqlSingle(${ENTITY_NAME} criteriaEntity);
     List<${ENTITY_NAME}> findByNativeSqlList(${ENTITY_NAME} criteriaEntity);
 }
 EOF
 
-    # Service Impl
+    # Service Impl file
     SERVICE_IMPL_FILE="${SERVICE_IMPL_DIR}/${ENTITY_NAME}ServiceImpl.java"
     cat > "$SERVICE_IMPL_FILE" <<EOF
 package ${SERVICE_IMPL_PACKAGE};
@@ -87,7 +94,8 @@ import jakarta.persistence.criteria.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
-import ${BASE_PACKAGE}.entity.${ENTITY_NAME};
+import ${BASE_PACKAGE}.${ENTITY_NAME};
+$IMPORT_ID_CLASS
 import ${BASE_PACKAGE}.repository.${ENTITY_NAME}Repository;
 import ${BASE_PACKAGE}.service.${ENTITY_NAME}Service;
 
@@ -256,7 +264,7 @@ public class ${ENTITY_NAME}ServiceImpl implements ${ENTITY_NAME}Service {
 }
 EOF
 
-    echo "✅ Generated: ${ENTITY_NAME}Repository, ${ENTITY_NAME}Service, ${ENTITY_NAME}ServiceImpl with EmbeddedId and dynamic SQL support"
+    echo "✅ Generated: ${ENTITY_NAME}Repository, ${ENTITY_NAME}Service, ${ENTITY_NAME}ServiceImpl with EmbeddedId support and dynamic imports"
 }
 
 for ENTITY_FILE in ${ENTITY_DIR}/*.java; do
