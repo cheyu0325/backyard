@@ -20,7 +20,7 @@ generate_files() {
     ENTITY_FILE=$1
     ENTITY_NAME=$(basename "$ENTITY_FILE" .java)
 
-    # ==== Extract ID type using awk to avoid misdetection ====
+    # ==== Extract ID type ====
     ID_TYPE=$(awk '
 /@Id/ {found=1; next}
 found && /private/ {match($0,/private[[:space:]]+([^[:space:]]+)[[:space:]]+/,a); print a[1]; exit}
@@ -38,20 +38,30 @@ found && /private/ {match($0,/private[[:space:]]+([^[:space:]]+)[[:space:]]+/,a)
         return
     fi
 
-    # ==== Extract table name from @Table or default entity name ====
+    # ==== Extract table name ====
     TABLE_NAME=$(grep "@Table" "$ENTITY_FILE" | sed -n 's/.*name *= *"\([^"]*\)".*/\1/p')
     if [ -z "$TABLE_NAME" ]; then
         TABLE_NAME=$(echo "$ENTITY_NAME" | awk '{print tolower($0)}')
     fi
 
-    # ==== Check if ID_TYPE is complex (EmbeddedId class) ====
+    # ==== Determine file paths ====
+    REPO_FILE="${REPO_DIR}/${ENTITY_NAME}Repository.java"
+    SERVICE_FILE="${SERVICE_DIR}/${ENTITY_NAME}Service.java"
+    SERVICE_IMPL_FILE="${SERVICE_IMPL_DIR}/${ENTITY_NAME}ServiceImpl.java"
+
+    # ==== Skip existing files ====
+    if [[ -f "$REPO_FILE" || -f "$SERVICE_FILE" || -f "$SERVICE_IMPL_FILE" ]]; then
+        echo "⚠️ Skipping ${ENTITY_NAME}: Repository or Service already exists."
+        return
+    fi
+
+    # ==== Handle EmbeddedId import ====
     IMPORT_ID_CLASS=""
     if [[ "$ID_TYPE" != "Long" && "$ID_TYPE" != "Integer" && "$ID_TYPE" != "String" ]]; then
         IMPORT_ID_CLASS="import ${BASE_PACKAGE}.${ID_TYPE};"
     fi
 
     # ==== Generate Repository ====
-    REPO_FILE="${REPO_DIR}/${ENTITY_NAME}Repository.java"
     cat > "$REPO_FILE" <<EOF
 package ${REPO_PACKAGE};
 
@@ -66,7 +76,6 @@ public interface ${ENTITY_NAME}Repository extends JpaRepository<${ENTITY_NAME}, 
 EOF
 
     # ==== Generate Service Interface ====
-    SERVICE_FILE="${SERVICE_DIR}/${ENTITY_NAME}Service.java"
     cat > "$SERVICE_FILE" <<EOF
 package ${SERVICE_PACKAGE};
 
@@ -88,7 +97,6 @@ public interface ${ENTITY_NAME}Service {
 EOF
 
     # ==== Generate Service Implementation ====
-    SERVICE_IMPL_FILE="${SERVICE_IMPL_DIR}/${ENTITY_NAME}ServiceImpl.java"
     cat > "$SERVICE_IMPL_FILE" <<EOF
 package ${SERVICE_IMPL_PACKAGE};
 
@@ -102,6 +110,8 @@ import jakarta.persistence.criteria.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import ${BASE_PACKAGE}.${ENTITY_NAME};
 $IMPORT_ID_CLASS
 import ${BASE_PACKAGE}.repository.${ENTITY_NAME}Repository;
@@ -109,6 +119,8 @@ import ${BASE_PACKAGE}.service.${ENTITY_NAME}Service;
 
 @Service
 public class ${ENTITY_NAME}ServiceImpl implements ${ENTITY_NAME}Service {
+
+    private static final Logger log = LoggerFactory.getLogger(${ENTITY_NAME}ServiceImpl.class);
 
     @Autowired
     private ${ENTITY_NAME}Repository repository;
@@ -121,30 +133,35 @@ public class ${ENTITY_NAME}ServiceImpl implements ${ENTITY_NAME}Service {
     @Override
     @Transactional
     public ${ENTITY_NAME} save(${ENTITY_NAME} entity) {
+        log.info("Saving ${ENTITY_NAME}: {}", entity);
         return repository.save(entity);
     }
 
     @Override
     @Transactional
     public ${ENTITY_NAME} update(${ENTITY_NAME} entity) {
+        log.info("Updating ${ENTITY_NAME}: {}", entity);
         return repository.save(entity);
     }
 
     @Override
     @Transactional(readOnly = true)
     public Optional<${ENTITY_NAME}> findById(${ID_TYPE} id) {
+        log.debug("Finding ${ENTITY_NAME} by ID: {}", id);
         return repository.findById(id);
     }
 
     @Override
     @Transactional
     public void delete(${ID_TYPE} id) {
+        log.warn("Deleting ${ENTITY_NAME} by ID: {}", id);
         repository.deleteById(id);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<${ENTITY_NAME}> findByCriteria(${ENTITY_NAME} criteriaEntity) {
+        log.debug("Executing Criteria Query for ${ENTITY_NAME}");
         CriteriaBuilder cb = em.getCriteriaBuilder();
         CriteriaQuery<${ENTITY_NAME}> cq = cb.createQuery(${ENTITY_NAME}.class);
         Root<${ENTITY_NAME}> root = cq.from(${ENTITY_NAME}.class);
@@ -203,6 +220,7 @@ public class ${ENTITY_NAME}ServiceImpl implements ${ENTITY_NAME}Service {
     @Override
     @Transactional(readOnly = true)
     public ${ENTITY_NAME} findByNativeSqlSingle(${ENTITY_NAME} criteriaEntity) {
+        log.debug("Executing Native SQL (Single Result) for ${ENTITY_NAME}");
         StringBuilder sql = new StringBuilder("SELECT * FROM ${TABLE_NAME} WHERE 1=1");
         Map<String, Object> params = new HashMap<>();
 
@@ -238,6 +256,7 @@ public class ${ENTITY_NAME}ServiceImpl implements ${ENTITY_NAME}Service {
     @Override
     @Transactional(readOnly = true)
     public List<${ENTITY_NAME}> findByNativeSqlList(${ENTITY_NAME} criteriaEntity) {
+        log.debug("Executing Native SQL (List Result) for ${ENTITY_NAME}");
         StringBuilder sql = new StringBuilder("SELECT * FROM ${TABLE_NAME} WHERE 1=1");
         Map<String, Object> params = new HashMap<>();
 
@@ -272,7 +291,7 @@ public class ${ENTITY_NAME}ServiceImpl implements ${ENTITY_NAME}Service {
 }
 EOF
 
-    echo "✅ Generated: ${ENTITY_NAME}Repository, ${ENTITY_NAME}Service, ${ENTITY_NAME}ServiceImpl (with EmbeddedId support and bug fix)"
+    echo "✅ Generated: ${ENTITY_NAME}Repository, ${ENTITY_NAME}Service, ${ENTITY_NAME}ServiceImpl (with SLF4J logger)"
 }
 
 for ENTITY_FILE in ${ENTITY_DIR}/*.java; do
